@@ -1,8 +1,10 @@
 ---
 title: "R Notebook"
 output: html_notebook
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
-
 
 ```{r}
 library(r2spss)
@@ -15,8 +17,6 @@ library(survival)
 library(survminer)
 ```
 
-
-
 ```{r load_and_preprocess}
 data <- read_sav("BASE DE DATOS AP2.sav")
 data$estudios <- as_factor(data$estudios)
@@ -26,13 +26,13 @@ data$glucemia <- as.numeric(data$glucemia)
 ```
 
 ## EJERCICIO 1. Determinar si el nivel de estudios de la población influye en la glucemia. En caso afirmativo, indicar entre qué grupos hay diferencias estadísticamente significativas.
+
 #### Pruebas de normalidad
 
 ```{r 1_explore}
 data %>%
   count(estudios)
 ```
-
 
 ```{r 1_normalidad}
 # Función para realizar la prueba adecuada dependiendo del tamaño de la muestra
@@ -72,13 +72,20 @@ realizar_prueba_por_nivel(data, "glucemia", "estudios")
 
 ```
 
-Realizamos la prueba de normalidad a una de las categorías de la variable estudios. En este caso "BACHILLER". Como se trata de un subgrupo de más de 30 individuos, usamos la prueba de normalidad de Shapiro-Wilk y esta nos indica que este subgrupo no sigue una distribución normal para la glucemia.
+Realizamos la prueba de normalidad a una de las categorías de la
+variable estudios. En este caso "BACHILLER". Como se trata de un
+subgrupo de más de 30 individuos, usamos la prueba de normalidad de
+Shapiro-Wilk y esta nos indica que este subgrupo no sigue una
+distribución normal para la glucemia.
 
-Al tener al menos un subgrupo con distribución no-normal debemos de descartar la prueba ANOVA y realizar en su lugar Kruskal Wallis.
+Al tener al menos un subgrupo con distribución no-normal debemos de
+descartar la prueba ANOVA y realizar en su lugar Kruskal Wallis.
 
-Esta prueba nos da un p-value de 2.238x10^-8, que nos permite rechazar con confianza la hipótesis nula de que todos los niveles de estudios tienen niveles de glucemia similares.
+Esta prueba nos da un p-value de 2.238x10\^-8, que nos permite rechazar
+con confianza la hipótesis nula de que todos los niveles de estudios
+tienen niveles de glucemia similares.
 
-```{r 1_prueba}
+```{r 1_kruskal}
 resultado_kruskal <- kruskal.test(glucemia ~ estudios, data = data)
 
 print(resultado_kruskal)
@@ -86,25 +93,40 @@ print(resultado_kruskal)
 ```
 
 ❓ ¿Entre qué grupos hay diferencias?
-```{r}
+
+```{r 1_dunn}
 dunn.test(data$glucemia, data$estudios, method = "bonferroni")
+```
+
+```{r 1_medianas}
+tapply(data$glucemia, data$estudios, median, na.rm = TRUE)
 ```
 
 Existen diferencias significativas entre los siguientes pares de variables:
 
-| Tipos de estudio                                       |   Estadístico de prueba estándar |   Sigma ajustado |
-|:-------------------------------------------------------|---------------------------------:|-----------------:|
-| ESTUDIOS PRIMARIOS vs BACHILLER                        |                          5.3288  |           0      |
-| ESTUDIOS PRIMARIOS vs DIPLOMATURA O INGENIERÍA TÉCNICA |                          3.44324 |           0.0029 |
-| LICENCIATURA vs ESTUDIOS PRIMARIOS                     |                         -3.95857 |           0.0004 |
+| Tipos de estudio | Estadístico de prueba estándar | Sigma ajustado |
+|:----------------------------------|--------------------:|----------------:|
+| ESTUDIOS PRIMARIOS vs BACHILLER | 5.3288 | 0 |
+| ESTUDIOS PRIMARIOS vs DIPLOMATURA O INGENIERÍA TÉCNICA | 3.44324 | 0.0029 |
+| LICENCIATURA vs ESTUDIOS PRIMARIOS | -3.95857 | 0.0004 |
 
+Lo cual muestra que las personas con estudios de bachiller o universitarios tienen unos niveles de glucemia en general superiores a quienes tienen menos estudios. 
 
 #### EJERCICIO 2. Comenta las siguientes gráficas.
-La gráfica 1 muestra el intervalo de confianza para la media de la concentración de triglicéridos en fumadores y en no fumadores. Ya que ambos intervalos se solapan no podemos afirmar que la media sea diferente entre ambos grupos.
 
-Sin embargo, en la gráfica 2, vemos que el nivel de glucemia sí presenta intervalos de confianza no solapados para fumadores y no fumadores, lo cual quiere decir que con un coeficiente de confianza del 95% podemos afirmar que los fumadores tienen una glucemia inferior, de media, que los no fumadores.
+La gráfica 1 muestra el intervalo de confianza para la media de la
+concentración de triglicéridos en fumadores y en no fumadores. Ya que
+ambos intervalos se solapan no podemos afirmar que la media sea
+diferente entre ambos grupos.
+
+Sin embargo, en la gráfica 2, vemos que el nivel de glucemia sí presenta
+intervalos de confianza no solapados para fumadores y no fumadores, lo
+cual quiere decir que con un coeficiente de confianza del 95% podemos
+afirmar que los fumadores tienen una glucemia inferior, de media, que
+los no fumadores.
 
 ## EJERCICIO 3. Determinar el riesgo de diabetes que resulta de tener una o dos copias de la variante genética del polimorfismo rs7903146 del gen TCF7L2.
+
 ```{r 3_explorar}
 unique(data$TCF7L2)
 ```
@@ -113,20 +135,27 @@ unique(data$TCF7L2)
 data$gen <- data$TCF7L2 != "-/-"
 oddsratio(table(data$gen, data$Diabetes))
 ```
-La OR es de 4.796. Esto quiere decir que las personas que presentan al menos un gen con el polimorfismo TCF7L2 tienen un riesgo de desarrollar diabetes es 4.796 veces superior con un intervalo de confianza del 95%.
+
+La OR es de 4.796. Esto quiere decir que las personas que presentan al
+menos un gen con el polimorfismo TCF7L2 tienen un riesgo de desarrollar
+diabetes es 4.796 veces superior con un intervalo de confianza del 95%.
 
 ## EJERCICIO 4. Se va a iniciar un estudio de investigación en el que, entre otras variables, se analizará la frecuencia cardíaca (FC) de los participantes. Dos técnicos se encargarán de la medición de la FC, por lo que antes de iniciar el estudio se plantea realizar unas mediciones y comprobar la concordancia entre las medidas de ambos técnicos.
-Valorar la concordancia entre las medidas de la FC obtenidas por ambos técnicos.
-#### a) Determinar la concordancia gráficamente.
 
+Valorar la concordancia entre las medidas de la FC obtenidas por ambos
+técnicos. \#### a) Determinar la concordancia gráficamente.
 
 #### b) Determinar el coeficiente de correlación intraclase.
+
 ```{r 4b_concordancia}
 icc(data[c("FC_1", "FC_2")])
 ```
-Existe una alta concordancia entre las medidas de ambos técnicos, con un coeficiente de correlación intraclase de 0.979.
+
+Existe una alta concordancia entre las medidas de ambos técnicos, con un
+coeficiente de correlación intraclase de 0.979.
 
 #### c) Determinar el coeficiente Kappa de Cohen. Tener en cuenta que FC normal = [60-100] latidos por minuto.
+
 ```{r 4c_categorizar}
 data$FC_1_cat <- data$FC_1 >= 60 & data$FC_1 <= 100
 data$FC_2_cat <- data$FC_2 >= 60 & data$FC_2 <= 100
@@ -136,19 +165,23 @@ data$FC_2_cat <- data$FC_2 >= 60 & data$FC_2 <= 100
 kappa2(data[c("FC_1_cat", "FC_2_cat")], "unweighted")
 ```
 
-Calculamos el coheficiente Kappa de Cohen obteniendo un valor de 0.94. Al estar este valor muy próximo al 1 y ser el p-value menor de 0.01 podemos decir que existe una gran concordancia entre las medidas de ambos técnicos.
+Calculamos el coheficiente Kappa de Cohen obteniendo un valor de 0.94.
+Al estar este valor muy próximo al 1 y ser el p-value menor de 0.01
+podemos decir que existe una gran concordancia entre las medidas de
+ambos técnicos.
 
 ## EJERCICIO 5. Se pretende comparar la efectividad de dos tratamientos frente al cáncer colorrectal. Tras el seguimiento, se realizan las siguientes observaciones:
--Tratamiento A: 6+, 7-, 9+, 11, 11, 12+, 13+, 16, 17, 17, 17+, 18, 20+, 20+, 20+, 21, 21+,
-22, 24-, 26+, 26+, 27, 29, 32, 44.
--Tratamiento B: 9+, 10, 11, 11+, 11+, 13+, 20+, 20+, 22, 28, 28, 30, 31, 31+, 36, 37+, 37+,
-38+, 39+, 41, 41, 46+, 50, 50+,50+.
 
-Utilizando el SPSS, determinar las tasas de supervivencia para los 2 grupos y realizar la gráfica
-comparativa de supervivencia (log-rank). Interpreta el resultado.
-Nota: el signo + indica observación censurada, y el signo – indica observación retirada (a efectos
-prácticos es igual a observación censurada).
+-Tratamiento A: 6+, 7-, 9+, 11, 11, 12+, 13+, 16, 17, 17, 17+, 18, 20+,
+20+, 20+, 21, 21+, 22, 24-, 26+, 26+, 27, 29, 32, 44. -Tratamiento B:
+9+, 10, 11, 11+, 11+, 13+, 20+, 20+, 22, 28, 28, 30, 31, 31+, 36, 37+,
+37+, 38+, 39+, 41, 41, 46+, 50, 50+,50+.
 
+Utilizando el SPSS, determinar las tasas de supervivencia para los 2
+grupos y realizar la gráfica comparativa de supervivencia (log-rank).
+Interpreta el resultado. Nota: el signo + indica observación censurada,
+y el signo – indica observación retirada (a efectos prácticos es igual a
+observación censurada).
 
 ```{r 5_load}
 data5 <- read.csv("datos_ejercicio5.csv")
@@ -162,10 +195,18 @@ surv5 <- Surv(time = data5$tiempo, event=data5$evento)
 surv5_fit <- survfit(surv5 ~ data5$tratamiento, data=data5)
 print(summary(surv5_fit))
 ```
+
 ```{r 5_plot}
 ggsurvplot(surv5_fit, data = data5)
 ```
-Presuponemos que los tratamientos se enfocan a evitar la mortalidad en pacientes con cáncer colorrectal diagnosticado y que la unidad de tiempo son meses.
-Ambos tratamientos presentan evoluciones muy parecidas hasta el mes 20, con una ligera ventaja para el tratamiento B. A partir de este momento la diferencia es mucho más marcada, atenuandose al aproximarse el mes 40 y perdiendose todos los sujetos del grupo con A poco después de este punto.
 
-Podemos concluir que el tratamiento B es más efectivo para evitar la muerte por cáncer colorrectal entre los pacientes con este diagnóstico.
+Presuponemos que los tratamientos se enfocan a evitar la mortalidad en
+pacientes con cáncer colorrectal diagnosticado y que la unidad de tiempo
+son meses. Ambos tratamientos presentan evoluciones muy parecidas hasta
+el mes 20, con una ligera ventaja para el tratamiento B. A partir de
+este momento la diferencia es mucho más marcada, atenuandose al
+aproximarse el mes 40 y perdiendose todos los sujetos del grupo con A
+poco después de este punto.
+
+Podemos concluir que el tratamiento B es más efectivo para evitar la
+muerte por cáncer colorrectal entre los pacientes con este diagnóstico.
