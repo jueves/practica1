@@ -15,11 +15,8 @@ library(haven)
 library(tidyverse)
 library(dunn.test)
 library(irr)
-```
-
-
-```{r}
 library(epitools)
+library(survival)
 ```
 
 
@@ -142,6 +139,12 @@ data$FC_1_cat <- data$FC_1 >= 60 & data$FC_1 <= 100
 data$FC_2_cat <- data$FC_2 >= 60 & data$FC_2 <= 100
 ```
 
+```{r 4c_determinar}
+kappa2(data[c("FC_1_cat", "FC_2_cat")], "unweighted")
+```
+
+Calculamos el coheficiente Kappa de Cohen obteniendo un valor de 0.94. Al estar este valor muy próximo al 1 y ser el p-value menor de 0.01 podemos decir que existe una gran concordancia entre las medidas de ambos técnicos.
+
 ## EJERCICIO 5. Se pretende comparar la efectividad de dos tratamientos frente al cáncer colorrectal. Tras el seguimiento, se realizan las siguientes observaciones:
 -Tratamiento A: 6+, 7-, 9+, 11, 11, 12+, 13+, 16, 17, 17, 17+, 18, 20+, 20+, 20+, 21, 21+,
 22, 24-, 26+, 26+, 27, 29, 32, 44.
@@ -152,3 +155,13 @@ Utilizando el SPSS, determinar las tasas de supervivencia para los 2 grupos y re
 comparativa de supervivencia (log-rank). Interpreta el resultado.
 Nota: el signo + indica observación censurada, y el signo – indica observación retirada (a efectos
 prácticos es igual a observación censurada).
+
+
+```{r 5_load}
+data5 <- read.csv("datos_ejercicio5.csv")
+```
+
+```{r 5_survival}
+# Análisis de supervivencia con library(survival)
+```
+
