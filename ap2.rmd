@@ -1,0 +1,154 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+
+```{r}
+library(r2spss)
+library(haven)
+library(tidyverse)
+library(dunn.test)
+library(irr)
+```
+
+
+```{r}
+library(epitools)
+```
+
+
+
+```{r load}
+data <- read_sav("BASE DE DATOS AP2.sav")
+```
+
+```{r preprocess}
+data$estudios <- as_factor(data$estudios)
+data$TCF7L2 <- as_factor(data$TCF7L2)
+data$Diabetes <- as.logical(as.numeric(data$Diabetes))
+data$glucemia <- as.numeric(data$glucemia)
+```
+
+## EJERCICIO 1. Determinar si el nivel de estudios de la población influye en la glucemia. En caso afirmativo, indicar entre qué grupos hay diferencias estadísticamente significativas.
+#### Pruebas de normalidad
+
+```{r 1_explore}
+data %>%
+  count(estudios)
+```
+
+
+```{r 1_normalidad}
+# Función para realizar la prueba adecuada dependiendo del tamaño de la muestra
+realizar_prueba_por_nivel <- function(data, var_numerica, var_categorica) {
+  
+  # 1. Obtener los niveles únicos de la variable categórica
+  niveles <- unique(data[[var_categorica]])
+  niveles <- niveles[!is.na(niveles)] 
+  
+  # 2. Iterar sobre cada nivel
+  for (nivel in niveles) {
+    
+    # Filtrar el subconjunto de datos para el nivel actual
+    subgrupo <- data[[var_numerica]][data[[var_categorica]] == nivel]
+    num_sujetos <- length(subgrupo)
+    
+    cat("\nAnálisis para el nivel:", nivel, "\n")
+    
+    # Verificar si hay datos suficientes para realizar alguna prueba
+    if (num_sujetos > 30) {
+      cat("Se utilizará la prueba de Kolmogorov-Smirnov (n > 30).\n")
+      # No es necesario especificar media y desviación estándar en ks.test
+      resultado_prueba <- ks.test(subgrupo, "pnorm")
+      print(resultado_prueba)
+    } else if (num_sujetos >= 3) {
+      cat("Se utilizará la prueba de Shapiro-Wilk (n ≤ 30).\n")
+      resultado_prueba <- shapiro.test(subgrupo)
+      print(resultado_prueba)
+    } else {
+      cat("No hay suficientes datos para realizar una prueba de normalidad.\n")
+    }
+  }
+}
+
+# Ejemplo de uso de la función
+realizar_prueba_por_nivel(data, "glucemia", "estudios")
+
+```
+
+Realizamos la prueba de normalidad a una de las categorías de la variable estudios. En este caso "BACHILLER". Como se trata de un subgrupo de más de 30 individuos, usamos la prueba de normalidad de Shapiro-Wilk y esta nos indica que este subgrupo no sigue una distribución normal para la glucemia.
+
+Al tener al menos un subgrupo con distribución no-normal debemos de descartar la prueba ANOVA y realizar en su lugar Kruskal Wallis.
+
+Esta prueba nos da un p-value de 2.238x10^-8, que nos permite rechazar con confianza la hipótesis nula de que todos los niveles de estudios tienen niveles de glucemia similares.
+
+```{r 1_prueba}
+resultado_kruskal <- kruskal.test(glucemia ~ estudios, data = data)
+
+print(resultado_kruskal)
+
+```
+
+❓ ¿Entre qué grupos hay diferencias?
+```{r}
+dunn.test(data$glucemia, data$estudios, method = "bonferroni")
+```
+
+Existen diferencias significativas entre los siguientes pares de variables:
+
+| Tipos de estudio                                       |   Estadístico de prueba estándar |   Sigma ajustado |
+|:-------------------------------------------------------|---------------------------------:|-----------------:|
+| ESTUDIOS PRIMARIOS vs BACHILLER                        |                          5.3288  |           0      |
+| ESTUDIOS PRIMARIOS vs DIPLOMATURA O INGENIERÍA TÉCNICA |                          3.44324 |           0.0029 |
+| LICENCIATURA vs ESTUDIOS PRIMARIOS                     |                         -3.95857 |           0.0004 |
+
+
+#### EJERCICIO 2. Comenta las siguientes gráficas.
+La gráfica 1 muestra el intervalo de confianza para la media de la concentración de triglicéridos en fumadores y en no fumadores. Ya que ambos intervalos se solapan no podemos afirmar que la media sea diferente entre ambos grupos.
+
+Sin embargo, en la gráfica 2, vemos que el nivel de glucemia sí presenta intervalos de confianza no solapados para fumadores y no fumadores, lo cual quiere decir que con un coeficiente de confianza del 95% podemos afirmar que los fumadores tienen una glucemia inferior, de media, que los no fumadores.
+
+## EJERCICIO 3. Determinar el riesgo de diabetes que resulta de tener una o dos copias de la variante genética del polimorfismo rs7903146 del gen TCF7L2.
+```{r 3_explorar}
+unique(data$TCF7L2)
+```
+
+```{r 3_OR}
+data$gen <- data$TCF7L2 != "-/-"
+oddsratio(table(data$gen, data$Diabetes))
+```
+La OR es de 4.796. Esto quiere decir que las personas que presentan al menos un gen con el polimorfismo TCF7L2 tienen un riesgo de desarrollar diabetes es 4.796 veces superior con un intervalo de confianza del 95%.
+
+## EJERCICIO 4. Se va a iniciar un estudio de investigación en el que, entre otras variables, se analizará la frecuencia cardíaca (FC) de los participantes. Dos técnicos se encargarán de la medición de la FC, por lo que antes de iniciar el estudio se plantea realizar unas mediciones y comprobar la concordancia entre las medidas de ambos técnicos.
+Valorar la concordancia entre las medidas de la FC obtenidas por ambos técnicos.
+#### a) Determinar la concordancia gráficamente.
+
+
+#### b) Determinar el coeficiente de correlación intraclase.
+```{r 4b_concordancia}
+icc(data[c("FC_1", "FC_2")])
+```
+Existe una alta concordancia entre las medidas de ambos técnicos, con un coeficiente de correlación intraclase de 0.979.
+
+#### c) Determinar el coeficiente Kappa de Cohen. Tener en cuenta que FC normal = [60-100] latidos por minuto.
+```{r 4c_categorizar}
+data$FC_1_cat <- data$FC_1 >= 60 & data$FC_1 <= 100
+data$FC_2_cat <- data$FC_2 >= 60 & data$FC_2 <= 100
+```
+
+## EJERCICIO 5. Se pretende comparar la efectividad de dos tratamientos frente al cáncer colorrectal. Tras el seguimiento, se realizan las siguientes observaciones:
+-Tratamiento A: 6+, 7-, 9+, 11, 11, 12+, 13+, 16, 17, 17, 17+, 18, 20+, 20+, 20+, 21, 21+,
+22, 24-, 26+, 26+, 27, 29, 32, 44.
+-Tratamiento B: 9+, 10, 11, 11+, 11+, 13+, 20+, 20+, 22, 28, 28, 30, 31, 31+, 36, 37+, 37+,
+38+, 39+, 41, 41, 46+, 50, 50+,50+.
+
+Utilizando el SPSS, determinar las tasas de supervivencia para los 2 grupos y realizar la gráfica
+comparativa de supervivencia (log-rank). Interpreta el resultado.
+Nota: el signo + indica observación censurada, y el signo – indica observación retirada (a efectos
+prácticos es igual a observación censurada).
