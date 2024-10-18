@@ -4,11 +4,6 @@ output: html_notebook
 ---
 
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-
-
-
-
 ```{r}
 library(r2spss)
 library(haven)
@@ -17,15 +12,13 @@ library(dunn.test)
 library(irr)
 library(epitools)
 library(survival)
+library(survminer)
 ```
 
 
 
-```{r load}
+```{r load_and_preprocess}
 data <- read_sav("BASE DE DATOS AP2.sav")
-```
-
-```{r preprocess}
 data$estudios <- as_factor(data$estudios)
 data$TCF7L2 <- as_factor(data$TCF7L2)
 data$Diabetes <- as.logical(as.numeric(data$Diabetes))
@@ -159,9 +152,20 @@ prácticos es igual a observación censurada).
 
 ```{r 5_load}
 data5 <- read.csv("datos_ejercicio5.csv")
+data5$Censura <- data5$Censura != ""
+names(data5) <- c("tiempo", "tratamiento", "evento")
 ```
 
 ```{r 5_survival}
 # Análisis de supervivencia con library(survival)
+surv5 <- Surv(time = data5$tiempo, event=data5$evento)
+surv5_fit <- survfit(surv5 ~ data5$tratamiento, data=data5)
+print(summary(surv5_fit))
 ```
+```{r 5_plot}
+ggsurvplot(surv5_fit, data = data5)
+```
+Presuponemos que los tratamientos se enfocan a evitar la mortalidad en pacientes con cáncer colorrectal diagnosticado y que la unidad de tiempo son meses.
+Ambos tratamientos presentan evoluciones muy parecidas hasta el mes 20, con una ligera ventaja para el tratamiento B. A partir de este momento la diferencia es mucho más marcada, atenuandose al aproximarse el mes 40 y perdiendose todos los sujetos del grupo con A poco después de este punto.
 
+Podemos concluir que el tratamiento B es más efectivo para evitar la muerte por cáncer colorrectal entre los pacientes con este diagnóstico.
